@@ -16,7 +16,7 @@ class BakkuClientServiceProvider extends ServiceProvider
         });
 
         // Load the configuration file
-        $this->mergeConfigFrom(__DIR__.'/../../config/bakkuclient.php', 'bakkuclient');
+        $this->mergeConfigFrom(__DIR__.'/../../Config/bakkuclient.php', 'bakkuclient');
     }
 
     public function boot()
