@@ -15,14 +15,13 @@ class BakkuClientServiceProvider extends ServiceProvider
             return new BakkuClientService(BakkuClientCacheService::class, BakkuClientDataService::class);
         });
 
-        // Load the configuration file
-        $this->mergeConfigFrom(__DIR__.'/../../Config/bakkuclient.php', 'bakkuclient');
+        $this->mergeConfigFrom(__DIR__.'/Config/bakkuclient.php', 'bakkuclient');
     }
 
     public function boot()
     {
         $this->publishes([
-            __DIR__.'/../../Config/bakkuclient.php' => config_path('bakkuclient.php'),
+            __DIR__.'/Config/bakkuclient.php' => config_path('bakkuclient.php'),
         ]);
     }
 }
