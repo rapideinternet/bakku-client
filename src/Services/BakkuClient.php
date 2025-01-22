@@ -2,8 +2,6 @@
 
 namespace RapideSoftware\BakkuClient\Services;
 
-use RapideSoftware\BakkuClient\Services\BakkuClientService;
-
 class BakkuClient
 {
     protected BakkuClientService $bakkuClientService;

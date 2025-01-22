@@ -22,7 +22,7 @@ class BakkuClientServiceProvider extends ServiceProvider
     public function boot()
     {
         $this->publishes([
-            __DIR__.'/../../config/bakkuclient.php' => config_path('bakkuclient.php'),
+            __DIR__.'/../../Config/bakkuclient.php' => config_path('bakkuclient.php'),
         ]);
     }
 }
