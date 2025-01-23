@@ -71,7 +71,7 @@ class BakkuClientService
     /**
      * Fetch JSON data with optional cache support
      */
-    public function fetchJsonData(?string $id = null, string $type = 'documents'): JsonResponse
+    private function fetchSiteContent(?string $id = null, string $type = 'documents'): JsonResponse
     {
         $cacheKey = $this->getCacheKey($id, $type);
         $cachedData = $this->cacheService->get($cacheKey);
@@ -103,7 +103,7 @@ class BakkuClientService
      */
     public function fetchData(string $endpoint, string $type = 'documents')
     {
-        $jsonResponse = $this->fetchJsonData($endpoint, $type);
+        $jsonResponse = $this->fetchSiteContent($endpoint, $type);
 
         if ($jsonResponse->status() !== 200) {
             return [];
@@ -144,7 +144,7 @@ class BakkuClientService
      */
     public function getPageLinks(): array
     {
-        $json = $this->fetchJsonData();
+        $json = $this->fetchSiteContent();
         return $this->dataService->getPageLinks($json->original['data']);
     }
 }
