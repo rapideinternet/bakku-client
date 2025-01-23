@@ -11,10 +11,10 @@ This is a Composer package that handles the data fetching from the Bakku CMS API
 
 ## How to get it to work:
 
-1. `composer config repositories.rapideinternet/bakku-client vcs https://github.com/rapideinternet/bakku-client` to add the package to your composer.json
-2. `composer require rapideinternet/bakku-client` to add the package to your `vendor`.
-3. `php artisan vendor:expose` to generate the bakkuclient.php config file.
-4. Add `BAKKU_SITE_ID` and `BAKKU_SITE_API_TOKEN` to your .env
+1. Run `composer config repositories.rapideinternet/bakku-client vcs https://github.com/rapideinternet/bakku-client` to add the package to your `composer.json`
+2. Run `composer require rapideinternet/bakku-client:dev-main` to add the package to your `vendor`.
+3. Run `php artisan vendor:expose` to generate the `bakkuclient.php` config file.
+4. Add `BAKKU_SITE_ID` and `BAKKU_SITE_API_TOKEN` to your `.env`
 5. Use `RapideSoftware\BakkuClient\Services\BakkuClient` for the API calls
 
 ## For any questions or info:
