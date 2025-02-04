@@ -3,17 +3,19 @@
 namespace RapideSoftware\BakkuClient;
 
 use Illuminate\Support\ServiceProvider;
-use RapideSoftware\BakkuClient\Services\BakkuClientCacheService;
-use RapideSoftware\BakkuClient\Services\BakkuClientDataService;
+use RapideSoftware\BakkuClient\Contracts\BakkuClientInterface;
+use RapideSoftware\BakkuClient\Contracts\CacheInterface;
 use RapideSoftware\BakkuClient\Services\BakkuClientService;
+use RapideSoftware\BakkuClient\Services\BakkuClientCacheService;
+use RapideSoftware\BakkuClient\Services\HttpClientService;
 
 class BakkuClientServiceProvider extends ServiceProvider
 {
     public function register()
     {
-        $this->app->singleton('BakkuClient', function ($app) {
-            return new BakkuClientService(BakkuClientCacheService::class, BakkuClientDataService::class);
-        });
+        $this->app->bind(BakkuClientInterface::class, BakkuClientService::class);
+        $this->app->bind(CacheInterface::class, BakkuClientCacheService::class);
+        $this->app->bind(HttpClientService::class, HttpClientService::class);
 
         $this->mergeConfigFrom(__DIR__.'/Config/bakkuclient.php', 'bakkuclient');
     }
@@ -25,5 +27,3 @@ class BakkuClientServiceProvider extends ServiceProvider
         ]);
     }
 }
-
-

@@ -5,17 +5,24 @@ namespace RapideSoftware\BakkuClient\Services;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use RapideSoftware\BakkuClient\Contracts\BakkuClientInterface;
+use RapideSoftware\BakkuClient\Contracts\CacheInterface;
 
-class BakkuClientService
+class BakkuClientService implements BakkuClientInterface
 {
-    private BakkuClientCacheService $cacheService;
+    private CacheInterface $cacheService;
     private BakkuClientDataService $dataService;
+    private HttpClientService $httpClientService;
     private int $ttl;
 
-    public function __construct(BakkuClientCacheService $cacheService, BakkuClientDataService $dataService)
-    {
+    public function __construct(
+        CacheInterface $cacheService,
+        BakkuClientDataService $dataService,
+        HttpClientService $httpClientService
+    ){
         $this->cacheService = $cacheService;
         $this->dataService = $dataService;
+        $this->httpClientService = $httpClientService;
         $this->ttl = $this->getCacheTtl();
     }
 
@@ -49,23 +56,15 @@ class BakkuClientService
     private function fetchFromApi(string $endpoint): array
     {
         $url = $this->buildApiUrl($endpoint);
+        $response = $this->httpClientService->get($url, [
+            'Authorization' => 'Bearer ' . config('bakkuclient.api_token')
+        ]);
 
-        try {
-            $response = Http::withToken(config('bakkuclient.api_token'))
-                ->timeout(10)
-                ->retry(3, 100)
-                ->get($url);
-
-            if ($response->failed()) {
-                Log::error('API request failed', ['url' => $url, 'status' => $response->status(), 'body' => $response->body()]);
-                return ['status_code' => $response->status(), 'content' => null, 'error' => $response->body()];
-            }
-
-            return ['status_code' => $response->status(), 'content' => json_decode($response->body(), false)];
-        } catch (\Exception $e) {
-            Log::error('API request exception', ['exception' => $e->getMessage()]);
-            return ['status_code' => 500, 'content' => null, 'error' => $e->getMessage()];
+        if ($response['status_code'] !== 200) {
+            return ['status_code' => $response['status_code'], 'content' => null, 'error' => $response['error']];
         }
+
+        return ['status_code' => $response['status_code'], 'content' => $response['content']];
     }
 
     /**
@@ -77,25 +76,19 @@ class BakkuClientService
         $cachedData = $this->cacheService->get($cacheKey);
 
         if ($cachedData) {
-            $content = json_decode($cachedData, false);
-            $source = 'Fetched from cache';
-            $statusCode = 200;
-        } else {
-            $response = $this->fetchFromApi($type . ($id ? '/' . $id : ''));
-            $statusCode = $response['status_code'];
-            $content = $response['content'];
-            $source = $statusCode === 200 ? 'Fetched from API' : 'Error fetching from API';
+            return response()->json(json_decode($cachedData, false), 200);
+        }
 
-            if ($statusCode === 200) {
-                $this->cacheService->set($cacheKey, json_encode($content), $this->ttl);
-            }
+        $response = $this->fetchFromApi($type . ($id ? '/' . $id : ''));
+        if ($response['status_code'] === 200) {
+            $this->cacheService->set($cacheKey, json_encode($response['content']), $this->ttl);
         }
 
         return response()->json([
-            'success' => $statusCode === 200,
-            'data' => $content,
-            'message' => $source,
-        ], $statusCode);
+            'success' => $response['status_code'] === 200,
+            'data' => $response['content'],
+            'message' => $response['status_code'] === 200 ? 'Fetched from API' : 'Error fetching from API',
+        ], $response['status_code']);
     }
 
     /**
@@ -106,10 +99,11 @@ class BakkuClientService
         $jsonResponse = $this->fetchSiteContent($endpoint, $type);
 
         if ($jsonResponse->status() !== 200) {
+            Log::warning('Failed to fetch data', ['endpoint' => $endpoint]);
             return [];
         }
 
-        return $jsonResponse->original['data'];
+        return $jsonResponse->original['data'] ?? [];
     }
 
     /**

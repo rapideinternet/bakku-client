@@ -3,8 +3,9 @@
 namespace RapideSoftware\BakkuClient\Services;
 
 use Illuminate\Support\Facades\Cache;
+use RapideSoftware\BakkuClient\Contracts\CacheInterface;
 
-class BakkuClientCacheService
+class BakkuClientCacheService implements CacheInterface
 {
     public function set(string $key, $value, int $ttl): void
     {

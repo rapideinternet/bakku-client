@@ -32,7 +32,7 @@ class BakkuClient
      */
     public function getImages(string $page): array
     {
-        return $this->bakkuClientService->getBlocks($page);
+        return $this->bakkuClientService->getImages($page);
     }
 
     /**
