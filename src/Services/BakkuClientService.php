@@ -80,19 +80,25 @@ class BakkuClientService implements BakkuClientInterface
         $cachedData = $this->cacheService->get($cacheKey);
 
         if ($cachedData) {
-            return response()->json(json_decode($cachedData, false), 200);
-        }
+            $content = json_decode($cachedData, false);
+            $source = 'Fetched from cache';
+            $statusCode = 200;
+        } else {
+            $response = $this->fetchFromApi($type . ($id ? '/' . $id : ''));
+            $statusCode = $response['status_code'];
+            $content = $response['content'];
+            $source = $statusCode === 200 ? 'Fetched from API' : 'Error fetching from API';
 
-        $response = $this->fetchFromApi($type . ($id ? '/' . $id : ''));
-        if ($response['status_code'] === 200) {
-            $this->cacheService->set($cacheKey, json_encode($response['content']), $this->ttl);
+            if ($statusCode === 200) {
+                $this->cacheService->set($cacheKey, json_encode($content), $this->ttl);
+            }
         }
 
         return response()->json([
-            'success' => $response['status_code'] === 200,
-            'data' => $response['content'],
-            'message' => $response['status_code'] === 200 ? 'Fetched from API' : 'Error fetching from API',
-        ], $response['status_code']);
+            'success' => $statusCode === 200,
+            'data' => $content,
+            'message' => $source,
+        ], $statusCode);
     }
 
     /**
