@@ -7,22 +7,26 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RapideSoftware\BakkuClient\Contracts\BakkuClientInterface;
 use RapideSoftware\BakkuClient\Contracts\CacheInterface;
+use RapideSoftware\BakkuClient\Transformers\ApiResponseTransformer;
 
 class BakkuClientService implements BakkuClientInterface
 {
     private CacheInterface $cacheService;
     private BakkuClientDataService $dataService;
     private HttpClientService $httpClientService;
+    private ApiResponseTransformer $apiTransformer;
     private int $ttl;
 
     public function __construct(
         CacheInterface $cacheService,
         BakkuClientDataService $dataService,
-        HttpClientService $httpClientService
+        HttpClientService $httpClientService,
+        ApiResponseTransformer $apiTransformer,
     ){
         $this->cacheService = $cacheService;
         $this->dataService = $dataService;
         $this->httpClientService = $httpClientService;
+        $this->apiTransformer = $apiTransformer;
         $this->ttl = $this->getCacheTtl();
     }
 
@@ -112,7 +116,7 @@ class BakkuClientService implements BakkuClientInterface
     public function getBlocks(string $page): array
     {
         $data = $this->fetchData($page);
-        return $data->data->attributes->blocks ?? [];
+        return $this->apiTransformer->transform($data, 'blocks');
     }
 
     /**
@@ -121,16 +125,16 @@ class BakkuClientService implements BakkuClientInterface
     public function getImages(string $page): array
     {
         $data = $this->fetchData($page);
-        return $data->included ?? [];
+        return $this->apiTransformer->transform($data, 'images');
     }
 
     /**
      * Get a single image by ID
      */
-    public function getSingleImage(string $imageId)
+    public function getSingleImage(string $imageId): array
     {
         $data = $this->fetchData($imageId, 'media');
-        return $data->data->attributes;
+        return $this->apiTransformer->transform($data, 'image');
     }
 
     /**
