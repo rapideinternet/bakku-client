@@ -47,7 +47,7 @@ class BakkuClientService implements BakkuClientInterface
      */
     private function getCacheTtl(): int
     {
-        return (!empty($_SERVER['HTTP_HOST']) && strpos($_SERVER['HTTP_HOST'], '.dev.')) ? 1 : 30;
+        return (!empty($_SERVER['HTTP_HOST']) && strpos($_SERVER['HTTP_HOST'], '.dev.')) ? 1 : config('bakkuclient.cache_ttl', 30);
     }
 
     /**

@@ -7,6 +7,7 @@ This is a Composer package that handles the data fetching from the <span style="
 ## <span style="color: #00cd91">Good to knows:</span>
 
 <span style="color: #00cd91">-</span> Has some built in caching through Laravel's Cache functionality; <br>
+<span style="color: #00cd91">-</span> Caching TTL is configurable in the `.env` with `BAKKU_CACHE_TTL`; <br>
 <span style="color: #00cd91">-</span> Still a work in progress; <br>
 
 ## <span style="color: #00cd91"> How to get it to work:</span>
