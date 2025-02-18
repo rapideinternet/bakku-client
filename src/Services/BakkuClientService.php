@@ -137,7 +137,7 @@ class BakkuClientService implements BakkuClientInterface
     /**
      * Get a single image by ID
      */
-    public function getSingleImage(string $imageId): array
+    public function getSingleImage(string $imageId): array|\stdClass
     {
         $data = $this->fetchData($imageId, 'media');
         return $this->apiTransformer->transform($data, 'image');

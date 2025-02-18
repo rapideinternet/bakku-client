@@ -38,7 +38,7 @@ class BakkuClient
     /**
      * Get a single image by ID
      */
-    public function getSingleImage(string $imageId)
+    public function getSingleImage(string $imageId): array|\stdClass
     {
         return $this->bakkuClientService->getSingleImage($imageId);
     }

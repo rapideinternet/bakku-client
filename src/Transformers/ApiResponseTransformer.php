@@ -2,9 +2,11 @@
 
 namespace RapideSoftware\BakkuClient\Transformers;
 
+use stdClass;
+
 class ApiResponseTransformer
 {
-    public function transform($response, string $type): array
+    public function transform($response, string $type): array|stdClass
     {
         if (!isset($response->data)) {
             return [];
@@ -28,8 +30,8 @@ class ApiResponseTransformer
         return $response->included ?? [];
     }
 
-    private function transformSingleImage($response): array
+    private function transformSingleImage($response): array|stdClass
     {
-        return $response->data->attributes ?? [];
+        return $response->data->attributes ?? new stdClass();
     }
 }
