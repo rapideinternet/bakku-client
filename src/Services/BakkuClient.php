@@ -14,7 +14,7 @@ class BakkuClient
     /**
      * Fetch data from API and return the data or empty array on failure
      */
-    private function getSiteContent(string $endpoint, string $type)
+    public function getSiteContent(string $endpoint, string $type)
     {
         return $this->bakkuClientService->fetchData($endpoint, $type);
     }
