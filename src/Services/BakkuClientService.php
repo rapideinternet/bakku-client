@@ -33,9 +33,10 @@ class BakkuClientService implements BakkuClientInterface
     /**
      * Build the API URL based on endpoint
      */
-    private function buildApiUrl(string $endpoint): string
+    private function buildApiUrl(string $endpoint, ?string $searchQuery = null): string
     {
-        return sprintf('https://api.bakku.cloud/v1/%s/%s', config('bakkuclient.site_id'), $endpoint);
+        $baseUrl = sprintf('https://api.bakku.cloud/v1/%s/%s', config('bakkuclient.site_id'), $endpoint);
+        return $searchQuery ? "{$baseUrl}/{$searchQuery}" : $baseUrl;
     }
 
     /**
@@ -57,9 +58,9 @@ class BakkuClientService implements BakkuClientInterface
     /**
      * Fetch data from the API and return the response
      */
-    private function fetchFromApi(string $endpoint): array
+    private function fetchFromApi(string $endpoint, ?string $searchQuery = null): array
     {
-        $url = $this->buildApiUrl($endpoint);
+        $url = $this->buildApiUrl($endpoint, $searchQuery ?? null);
         $response = $this->httpClientService->get($url, [
             'Authorization' => 'Bearer ' . config('bakkuclient.api_token')
         ]);
@@ -74,7 +75,7 @@ class BakkuClientService implements BakkuClientInterface
     /**
      * Fetch JSON data with optional cache support
      */
-    private function fetchSiteContent(?string $id = null, string $type = 'documents'): JsonResponse
+    private function fetchSiteContent(?string $id = null, string $type = 'documents', ?string $searchQuery = null): JsonResponse
     {
         $cacheKey = $this->getCacheKey($id, $type);
         $cachedData = $this->cacheService->get($cacheKey);
@@ -84,12 +85,12 @@ class BakkuClientService implements BakkuClientInterface
             $source = 'Fetched from cache';
             $statusCode = 200;
         } else {
-            $response = $this->fetchFromApi($type . ($id ? '/' . $id : ''));
+            $response = $this->fetchFromApi($type . ($id ? '/' . $id : ''), $searchQuery);
             $statusCode = $response['status_code'];
             $content = $response['content'];
             $source = $statusCode === 200 ? 'Fetched from API' : 'Error fetching from API';
 
-            if ($statusCode === 200) {
+            if ($statusCode === 200 && $searchQuery == null) {
                 $this->cacheService->set($cacheKey, json_encode($content), $this->ttl);
             }
         }
@@ -149,6 +150,15 @@ class BakkuClientService implements BakkuClientInterface
     public function getPageLinks(): array
     {
         $json = $this->fetchSiteContent();
+        return $this->dataService->getPageLinks($json->original['data']);
+    }
+
+    /**
+     * Get all pages that have the search query on it
+     */
+    public function getSearchData(string $searchQuery): array
+    {
+        $json = $this->fetchSiteContent(null, 'search', $searchQuery);
         return $this->dataService->getPageLinks($json->original['data']);
     }
 }

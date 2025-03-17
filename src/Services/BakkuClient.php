@@ -50,4 +50,12 @@ class BakkuClient
     {
         return $this->bakkuClientService->getPageLinks();
     }
+
+    /**
+     * Get all pages that have the search query on it
+     */
+    public function getSearchResults(string $searchQuery): array
+    {
+        return $this->bakkuClientService->getSearchData($searchQuery);
+    }
 }
