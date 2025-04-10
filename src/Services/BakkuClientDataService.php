@@ -17,6 +17,7 @@ class BakkuClientDataService
             'template' => $response->attributes->template_label ?? null,
             'metaTitle' => $response->attributes->props->seo_title ?? null,
             'metaDescription' => $response->attributes->props->seo_description ?? null,
+            'relatedPageUid' => reset($response->attributes->related_locales) ?? null,
         ], $data->data);
     }
 }
