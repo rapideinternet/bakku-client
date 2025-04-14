@@ -58,4 +58,12 @@ class BakkuClient
     {
         return $this->bakkuClientService->getSearchData($searchQuery);
     }
+
+    /**
+     * Get data from a filter (e.g. filter[menu]=menu_name)
+     */
+    public function getFilteredData(string $filter): array
+    {
+        return $this->bakkuClientService->getFilteredData($filter);
+    }
 }
