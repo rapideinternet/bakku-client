@@ -77,7 +77,7 @@ class BakkuClientService implements BakkuClientInterface
      */
     private function fetchSiteContent(?string $id = null, string $type = 'documents', ?string $searchQuery = null, ?string $filter = null): JsonResponse
     {
-        $cacheKey = $this->getCacheKey($id, $type);
+        $cacheKey = $this->getCacheKey($id . ($filter ? '_'.$filter : null), $type);
         $cachedData = $this->cacheService->get($cacheKey);
 
         if ($cachedData) {
@@ -91,7 +91,7 @@ class BakkuClientService implements BakkuClientInterface
             $source = $statusCode === 200 ? 'Fetched from API' : 'Error fetching from API';
 
             if ($statusCode === 200 && $searchQuery == null) {
-                $this->cacheService->set($cacheKey, json_encode($content), $this->ttl);
+                $this->cacheService->set($cacheKey . ($filter ? '_'.$filter : null), json_encode($content), $this->ttl);
             }
         }
 
