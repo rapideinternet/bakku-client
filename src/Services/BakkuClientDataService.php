@@ -12,6 +12,7 @@ class BakkuClientDataService
 
         return array_map(fn($response) => [
             'id' => $response->id ?? null,
+            'title' => $response->attributes->title ?? null,
             'pageUrl' => $response->attributes->url ?? null,
             'slug' => $response->attributes->slug ?? null,
             'template' => $response->attributes->template_label ?? null,
