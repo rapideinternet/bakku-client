@@ -16,4 +16,8 @@ class BakkuClientCacheService implements CacheInterface
     {
         return Cache::get($key);
     }
+
+    public function flexible(string $key, array $ttl, $func) {
+        return Cache::flexible($key, $ttl, $func);
+    }
 }

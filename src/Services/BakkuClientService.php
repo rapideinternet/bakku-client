@@ -75,9 +75,39 @@ class BakkuClientService implements BakkuClientInterface
     /**
      * Fetch JSON data with optional cache support
      */
+    private function fetchSiteContentNew(?string $id = null, string $type = 'documents', ?string $searchQuery = null, ?string $filter = null): JsonResponse
+    {
+        $cacheKey = $this->getCacheKey($id . ($filter ? '_'.$filter : null), $type);
+
+        $cachedData = $this->cacheService->flexible($cacheKey, [$this.ttl, 300], function() use ($cacheKey, $id, $type, $searchQuery, $filter) {
+            $response = $this->fetchFromApi($type . ($id ? '/' . $id : ''), $searchQuery, $filter);
+            $statusCode = $response['status_code'];
+            $content = $response['content'];
+            $source = $statusCode === 200 ? 'Fetched from API' : 'Error fetching from API';
+
+            if ($statusCode === 200 && $searchQuery == null) {
+                return json_encode($content);
+            }
+        });
+
+        $content = json_decode($cachedData, false);
+        $source = 'Fetched from cache';
+        $statusCode = 200;
+
+        return response()->json([
+            'success' => $statusCode === 200,
+            'data' => $content,
+            'message' => $source,
+        ], $statusCode);
+    }
+
+    /**
+     * Fetch JSON data with optional cache support
+     */
     private function fetchSiteContent(?string $id = null, string $type = 'documents', ?string $searchQuery = null, ?string $filter = null): JsonResponse
     {
         $cacheKey = $this->getCacheKey($id . ($filter ? '_'.$filter : null), $type);
+
         $cachedData = $this->cacheService->get($cacheKey);
 
         if ($cachedData) {
@@ -91,7 +121,7 @@ class BakkuClientService implements BakkuClientInterface
             $source = $statusCode === 200 ? 'Fetched from API' : 'Error fetching from API';
 
             if ($statusCode === 200 && $searchQuery == null) {
-                $this->cacheService->set($cacheKey . ($filter ? '_'.$filter : null), json_encode($content), $this->ttl);
+                $this->cacheService->set($cacheKey, json_encode($content), $this->ttl);
             }
         }
 
