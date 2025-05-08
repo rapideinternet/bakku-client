@@ -79,7 +79,7 @@ class BakkuClientService implements BakkuClientInterface
     {
         $cacheKey = $this->getCacheKey($id . ($filter ? '_'.$filter : null), $type);
 
-        $cachedData = $this->cacheService->flexible($cacheKey, [$this.ttl, 300], function() use ($cacheKey, $id, $type, $searchQuery, $filter) {
+        $cachedData = $this->cacheService->flexible($cacheKey, [$this->ttl, 300], function() use ($cacheKey, $id, $type, $searchQuery, $filter) {
             $response = $this->fetchFromApi($type . ($id ? '/' . $id : ''), $searchQuery, $filter);
             $statusCode = $response['status_code'];
             $content = $response['content'];
