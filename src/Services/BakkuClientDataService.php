@@ -19,6 +19,7 @@ class BakkuClientDataService
             'hidden' => $response->attributes->props->hide ?? null,
             'metaTitle' => $response->attributes->props->seo_title ?? null,
             'metaDescription' => $response->attributes->props->seo_description ?? null,
+            'metaImage' => $response->attributes->props->seo_image ?? null,
             'relatedPageUid' => reset($response->attributes->related_locales) ?? null,
         ], $data->data);
     }
