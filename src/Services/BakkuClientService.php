@@ -2,32 +2,26 @@
 
 namespace RapideSoftware\BakkuClient\Services;
 
-use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use RapideSoftware\BakkuClient\Contracts\BakkuClientInterface;
-use RapideSoftware\BakkuClient\Contracts\CacheInterface;
 use RapideSoftware\BakkuClient\Transformers\ApiResponseTransformer;
 
 class BakkuClientService implements BakkuClientInterface
 {
-    private CacheInterface $cacheService;
-    private BakkuClientDataService $dataService;
     private HttpClientService $httpClientService;
     private ApiResponseTransformer $apiTransformer;
-    private int $ttl;
+    private BakkuClientDataService $dataService;
 
     public function __construct(
-        CacheInterface $cacheService,
-        BakkuClientDataService $dataService,
         HttpClientService $httpClientService,
         ApiResponseTransformer $apiTransformer,
+        BakkuClientDataService $dataService
     ){
-        $this->cacheService = $cacheService;
-        $this->dataService = $dataService;
         $this->httpClientService = $httpClientService;
         $this->apiTransformer = $apiTransformer;
-        $this->ttl = $this->getCacheTtl();
+        $this->dataService = $dataService;
     }
 
     /**
@@ -35,16 +29,8 @@ class BakkuClientService implements BakkuClientInterface
      */
     private function buildApiUrl(string $endpoint, ?string $searchQuery = null, ?string $filter = null): string
     {
-        $baseUrl = sprintf('https://api.bakku.cloud/v1/%s/%s', config('bakkuclient.site_id'), $endpoint . $filter);
+        $baseUrl = sprintf('https://api.bakku.cloud/v1/%s/%s', config('bakkuclient.site_id'), $endpoint . ($filter ?? ''));
         return $searchQuery ? "{$baseUrl}/{$searchQuery}" : $baseUrl;
-    }
-
-    /**
-     * Generate a cache key based on ID and type
-     */
-    private function getCacheKey(?string $id, string $type): string
-    {
-        return sprintf('%s:%s', $type, $id ?? 'default');
     }
 
     /**
@@ -52,152 +38,111 @@ class BakkuClientService implements BakkuClientInterface
      */
     private function getCacheTtl(): int
     {
-        return (!empty($_SERVER['HTTP_HOST']) && strpos($_SERVER['HTTP_HOST'], '.dev.')) ? 1 : config('bakkuclient.cache_ttl', 30);
+        return config('bakkuclient.cache_ttl');
     }
 
     /**
-     * Fetch data from the API and return the response
+     * Fetch data from the API and return the content
      */
-    private function fetchFromApi(string $endpoint, ?string $searchQuery = null, ?string $filter = null): array
+    private function fetchFromApi(?string $id = null, string $type = 'documents', ?string $searchQuery = null, ?string $filter = null)
     {
-        $url = $this->buildApiUrl($endpoint, $searchQuery ?? null, $filter ?? null);
+        $url = $this->buildApiUrl($type . ($id ? '/' . $id : ''), $searchQuery, $filter);
         $response = $this->httpClientService->get($url, [
             'Authorization' => 'Bearer ' . config('bakkuclient.api_token')
         ]);
 
         if ($response['status_code'] !== 200) {
-            return ['status_code' => $response['status_code'], 'content' => null, 'error' => $response['error']];
-        }
-
-        return ['status_code' => $response['status_code'], 'content' => $response['content']];
-    }
-
-    /**
-     * Fetch JSON data with optional cache support
-     */
-    private function fetchSiteContentNew(?string $id = null, string $type = 'documents', ?string $searchQuery = null, ?string $filter = null): JsonResponse
-    {
-        $cacheKey = $this->getCacheKey($id . ($filter ? '_'.$filter : null), $type);
-
-        $cachedData = $this->cacheService->flexible($cacheKey, [$this->ttl, 300], function() use ($cacheKey, $id, $type, $searchQuery, $filter) {
-            $response = $this->fetchFromApi($type . ($id ? '/' . $id : ''), $searchQuery, $filter);
-            $statusCode = $response['status_code'];
-            $content = $response['content'];
-            $source = $statusCode === 200 ? 'Fetched from API' : 'Error fetching from API';
-
-            if ($statusCode === 200 && $searchQuery == null) {
-                return json_encode($content);
-            }
-        });
-
-        $content = json_decode($cachedData, false);
-        $source = 'Fetched from cache';
-        $statusCode = 200;
-
-        return response()->json([
-            'success' => $statusCode === 200,
-            'data' => $content,
-            'message' => $source,
-        ], $statusCode);
-    }
-
-    /**
-     * Fetch JSON data with optional cache support
-     */
-    private function fetchSiteContent(?string $id = null, string $type = 'documents', ?string $searchQuery = null, ?string $filter = null): JsonResponse
-    {
-        $cacheKey = $this->getCacheKey($id . ($filter ? '_'.$filter : null), $type);
-
-        $cachedData = $this->cacheService->get($cacheKey);
-
-        if ($cachedData) {
-            $content = json_decode($cachedData, false);
-            $source = 'Fetched from cache';
-            $statusCode = 200;
-        } else {
-            $response = $this->fetchFromApi($type . ($id ? '/' . $id : ''), $searchQuery, $filter);
-            $statusCode = $response['status_code'];
-            $content = $response['content'];
-            $source = $statusCode === 200 ? 'Fetched from API' : 'Error fetching from API';
-
-            if ($statusCode === 200 && $searchQuery == null) {
-                $this->cacheService->set($cacheKey, json_encode($content), $this->ttl);
-            }
-        }
-
-        return response()->json([
-            'success' => $statusCode === 200,
-            'data' => $content,
-            'message' => $source,
-        ], $statusCode);
-    }
-
-    /**
-     * Fetch data from API and return the data or empty array on failure
-     */
-    public function fetchData(string $endpoint, string $type = 'documents')
-    {
-        $jsonResponse = $this->fetchSiteContent($endpoint, $type);
-
-        if ($jsonResponse->status() !== 200) {
-            Log::warning('Failed to fetch data', ['endpoint' => $endpoint]);
+            Log::warning('Failed to fetch data from API', [
+                'endpoint' => $type . ($id ? '/' . $id : ''),
+                'searchQuery' => $searchQuery,
+                'filter' => $filter,
+                'status_code' => $response['status_code'],
+                'error' => $response['error']
+            ]);
             return [];
         }
 
-        return $jsonResponse->original['data'] ?? [];
+        return $response['content'];
     }
 
     /**
-     * Get blocks for a specific page
+     * Get a unique cache key
+     */
+    private function getCacheKey(string $type, ?string $id = null, ?string $searchQuery = null, ?string $filter = null): string
+    {
+        $key = sprintf('bakku:%s:%s', $type, $id ?? 'all');
+        if ($searchQuery) {
+            $key .= ':search-' . md5($searchQuery);
+        }
+        if ($filter) {
+            $key .= ':filter-' . md5($filter);
+        }
+        return $key;
+    }
+
+    /**
+     * Get blocks for a specific page with caching
      */
     public function getBlocks(string $page): array
     {
-        $data = $this->fetchData($page);
-        return $this->apiTransformer->transform($data, 'blocks');
+        return Cache::remember($this->getCacheKey('blocks', $page), $this->getCacheTtl(), function () use ($page) {
+            $data = $this->fetchFromApi($page, 'documents');
+            return $this->apiTransformer->transform($data, 'blocks');
+        });
     }
 
     /**
-     * Get images for a specific page
+     * Get images for a specific page with caching
      */
     public function getImages(string $page): array
     {
-        $data = $this->fetchData($page);
-        return $this->apiTransformer->transform($data, 'images');
+        return Cache::remember($this->getCacheKey('images', $page), $this->getCacheTtl(), function () use ($page) {
+            $data = $this->fetchFromApi($page, 'documents');
+            return $this->apiTransformer->transform($data, 'images');
+        });
     }
 
     /**
-     * Get a single image by ID
-     */
-    public function getSingleImage(string $imageId): array|\stdClass
-    {
-        $data = $this->fetchData($imageId, 'media');
-        return $this->apiTransformer->transform($data, 'image');
-    }
-
-    /**
-     * Get all page links
+     * Get all page links with caching
      */
     public function getPageLinks(): array
     {
-        $json = $this->fetchSiteContent();
-        return $this->dataService->getPageLinks($json->original['data']);
+        return Cache::remember($this->getCacheKey('page-links'), $this->getCacheTtl(), function () {
+            $data = $this->fetchFromApi(null, 'documents');
+            return $this->dataService->getPageLinks($data);
+        });
     }
 
     /**
-     * Get all pages that have the search query on it
+     * Get a single image by ID with caching
+     */
+    public function getSingleImage(string $imageId): array|\stdClass
+    {
+        return Cache::remember($this->getCacheKey('single-image', $imageId), $this->getCacheTtl(), function () use ($imageId) {
+            $data = $this->fetchFromApi($imageId, 'media');
+            return $this->apiTransformer->transform($data, 'image');
+        });
+    }
+
+    /**
+     * Get all pages that have the search query on it with caching
      */
     public function getSearchData(string $searchQuery): array
     {
-        $json = $this->fetchSiteContent(null, 'search', $searchQuery);
-        return $this->dataService->getPageLinks($json->original['data']);
+        return Cache::remember($this->getCacheKey('search', null, $searchQuery), $this->getCacheTtl(), function () use ($searchQuery) {
+            $data = $this->fetchFromApi('search', $searchQuery);
+            return $this->dataService->getPageLinks($data);
+        });
     }
 
     /**
-     * Get filtered result
+     * Get filtered result with caching
      */
     public function getFilteredData(string $filter, string $type = 'documents'): array
     {
-        $json = $this->fetchSiteContent(null, $type, null, $filter);
-        return $this->dataService->getPageLinks($json->original['data']);
+        return Cache::remember($this->getCacheKey('filtered-data', null, null, $filter), $this->getCacheTtl(), function () use ($filter, $type) {
+            $data = $this->fetchFromApi(null, $type, null, $filter);
+            return $this->dataService->getPageLinks($data);
+        });
     }
 }
