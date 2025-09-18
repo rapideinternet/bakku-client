@@ -44,7 +44,7 @@ class BakkuClientService implements BakkuClientInterface
     /**
      * Fetch data from the API and return the content
      */
-    private function fetchFromApi(?string $id = null, string $type = 'documents', ?string $searchQuery = null, ?string $filter = null)
+    public function fetchFromApi(?string $id = null, string $type = 'documents', ?string $searchQuery = null, ?string $filter = null)
     {
         $url = $this->buildApiUrl($type . ($id ? '/' . $id : ''), $searchQuery, $filter);
         $response = $this->httpClientService->get($url, [

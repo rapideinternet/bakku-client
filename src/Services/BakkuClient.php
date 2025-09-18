@@ -16,7 +16,7 @@ class BakkuClient
      */
     public function getSiteContent(string $endpoint, string $type)
     {
-        return $this->bakkuClientService->fetchData($endpoint, $type);
+        return $this->bakkuClientService->fetchFromApi($endpoint, $type);
     }
 
     /**
