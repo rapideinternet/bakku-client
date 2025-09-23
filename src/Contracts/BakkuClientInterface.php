@@ -10,4 +10,5 @@ interface BakkuClientInterface
     public function getPageLinks(): array;
     public function getSearchData(string $searchQuery): array;
     public function getFilteredData(string $filter, string $type = 'documents'): array;
+    public function getSiteContent(string $endpoint, string $type): array;
 }
