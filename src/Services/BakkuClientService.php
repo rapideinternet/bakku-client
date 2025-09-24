@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use RapideSoftware\BakkuClient\Contracts\BakkuClientInterface;
 use RapideSoftware\BakkuClient\Transformers\ApiResponseTransformer;
+use stdClass;
 
 class BakkuClientService implements BakkuClientInterface
 {
@@ -30,7 +31,7 @@ class BakkuClientService implements BakkuClientInterface
     private function buildApiUrl(string $type, ?string $id = null, ?string $searchQuery = null, ?string $filter = null): string
     {
         $path = $type . ($id ? '/' . $id : '') . ($filter ?? '');
-        $baseUrl = "https://api.bakku.cloud/v1/{config('bakkuclient.site_id')}/{$path}";
+        $baseUrl = "https://api.bakku.cloud/v1/" . config('bakkuclient.site_id') . "/{$path}";
 
         return $searchQuery ? "{$baseUrl}/{$searchQuery}" : $baseUrl;
     }
@@ -61,7 +62,7 @@ class BakkuClientService implements BakkuClientInterface
     /**
      * Fetch and cache data from the API.
      */
-    private function cacheAndFetch(string $cacheKey, \Closure $callback): array
+    private function cacheAndFetch(string $cacheKey, \Closure $callback): array|\stdClass
     {
         return Cache::remember($cacheKey, $this->getCacheTtl(), $callback);
     }
@@ -69,7 +70,7 @@ class BakkuClientService implements BakkuClientInterface
     /**
      * Fetch data from the API.
      */
-    private function fetchFromApi(string $type, ?string $id = null, ?string $searchQuery = null, ?string $filter = null): array
+    private function fetchFromApi(string $type, ?string $id = null, ?string $searchQuery = null, ?string $filter = null): array|\stdClass
     {
         $url = $this->buildApiUrl($type, $id, $searchQuery, $filter);
         $response = $this->httpClientService->get($url, [
@@ -91,7 +92,7 @@ class BakkuClientService implements BakkuClientInterface
     /**
      * Get blocks for a specific page.
      */
-    public function getBlocks(string $page): array
+    public function getBlocks(string $page): array|\stdClass
     {
         return $this->cacheAndFetch($this->getCacheKey('blocks', $page), function () use ($page) {
             $data = $this->fetchFromApi('documents', $page);
@@ -102,7 +103,7 @@ class BakkuClientService implements BakkuClientInterface
     /**
      * Get images for a specific page.
      */
-    public function getImages(string $page): array
+    public function getImages(string $page): array|\stdClass
     {
         return $this->cacheAndFetch($this->getCacheKey('images', $page), function () use ($page) {
             $data = $this->fetchFromApi('documents', $page);
@@ -113,7 +114,7 @@ class BakkuClientService implements BakkuClientInterface
     /**
      * Get all page links.
      */
-    public function getPageLinks(): array
+    public function getPageLinks(): array|\stdClass
     {
         return $this->cacheAndFetch($this->getCacheKey('page-links'), function () {
             $data = $this->fetchFromApi('documents');
@@ -124,7 +125,7 @@ class BakkuClientService implements BakkuClientInterface
     /**
      * Get a single image by ID.
      */
-    public function getSingleImage(string $imageId): array
+    public function getSingleImage(string $imageId): array|\stdClass
     {
         return $this->cacheAndFetch($this->getCacheKey('single-image', $imageId), function () use ($imageId) {
             $data = $this->fetchFromApi('media', $imageId);
@@ -135,7 +136,7 @@ class BakkuClientService implements BakkuClientInterface
     /**
      * Get all pages that have the search query on them.
      */
-    public function getSearchData(string $searchQuery): array
+    public function getSearchData(string $searchQuery): array|\stdClass
     {
         return $this->cacheAndFetch($this->getCacheKey('search', null, $searchQuery), function () use ($searchQuery) {
             $data = $this->fetchFromApi('search', null, $searchQuery);
@@ -146,7 +147,7 @@ class BakkuClientService implements BakkuClientInterface
     /**
      * Get filtered result.
      */
-    public function getFilteredData(string $filter, string $type = 'documents'): array
+    public function getFilteredData(string $filter, string $type = 'documents'): array|\stdClass
     {
         return $this->cacheAndFetch($this->getCacheKey('filtered-data', null, null, $filter), function () use ($filter, $type) {
             $data = $this->fetchFromApi($type, null, null, $filter);
@@ -154,7 +155,7 @@ class BakkuClientService implements BakkuClientInterface
         });
     }
 
-    public function getSiteContent(string $endpoint, string $type): array
+    public function getSiteContent(string $endpoint, string $type): array|\stdClass
     {
         return $this->cacheAndFetch($this->getCacheKey($type, $endpoint), function () use ($endpoint, $type) {
             $data = $this->fetchFromApi($type, $endpoint);
