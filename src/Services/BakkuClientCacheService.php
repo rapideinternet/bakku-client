@@ -9,7 +9,7 @@ class BakkuClientCacheService implements CacheInterface
 {
     public function set(string $key, $value, int $ttl): void
     {
-        Cache::put($key, $value, $ttl);
+        Cache::add($key, $value, $ttl);
     }
 
     public function get(string $key)
@@ -17,8 +17,7 @@ class BakkuClientCacheService implements CacheInterface
         return Cache::get($key);
     }
 
-    public function remember(string $key, int $ttl, \Closure $callback)
-    {
-        return Cache::remember($key, $ttl, $callback);
+    public function flexible(string $key, array $ttl, $func) {
+        return Cache::flexible($key, $ttl, $func);
     }
 }
