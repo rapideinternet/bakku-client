@@ -30,5 +30,13 @@
                 "BakkuClient": "RapideSoftware\\BakkuClient\\Facades\\BakkuClient"
             }
         }
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^1.10",
+        "larastan/larastan": "^2.0",
+        "orchestra/testbench": "^8.0"
+    },
+    "scripts": {
+        "phpstan": "phpstan analyse --level=max src/"
     }
 }

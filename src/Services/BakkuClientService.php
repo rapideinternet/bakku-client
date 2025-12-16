@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace RapideSoftware\BakkuClient\Services;
 
@@ -7,15 +7,17 @@ use RapideSoftware\BakkuClient\Contracts\BakkuClientInterface;
 use RapideSoftware\BakkuClient\Contracts\CacheInterface;
 use RapideSoftware\BakkuClient\Transformers\ApiResponseTransformer;
 use RapideSoftware\BakkuClient\Exceptions\BakkuClientApiException;
+use RapideSoftware\BakkuClient\Exceptions\HttpClientClientException;
+use RapideSoftware\BakkuClient\Exceptions\HttpClientNetworkException;
+use RapideSoftware\BakkuClient\Exceptions\HttpClientServerException;
+use RapideSoftware\BakkuClient\DTO\Block;
+use RapideSoftware\BakkuClient\DTO\Image;
+use RapideSoftware\BakkuClient\DTO\PageLink;
 use stdClass;
 
 class BakkuClientService implements BakkuClientInterface
 {
     // API Types
-    private const API_TYPE_DOCUMENTS = 'documents';
-    private const API_TYPE_MEDIA = 'media';
-    private const API_TYPE_SEARCH = 'search';
-
     // Cache Keys
     private const CACHE_KEY_BLOCKS = 'blocks';
     private const CACHE_KEY_IMAGES = 'images';
@@ -53,11 +55,14 @@ class BakkuClientService implements BakkuClientInterface
 
     /**
      * Determine cache TTL based on environment.
+     * @return int
      */
     private function getCacheTtl(): int
     {
-        return config('bakkuclient.cache_ttl', 3600);
+        /** @phpstan-ignore-next-line */
+        return (int)config('bakkuclient.cache_ttl', 3600);
     }
+
 
     /**
      * Get a unique cache key.
@@ -75,109 +80,183 @@ class BakkuClientService implements BakkuClientInterface
     }
 
     /**
-     * Fetch and cache data from the API.
+     * Generate cache tags for a given type and ID.
+     * @return string[]
      */
-    private function cacheAndFetch(string $cacheKey, \Closure $callback): array|\stdClass
+    private function generateCacheTags(string $type, ?string $id = null): array
     {
-        return $this->cacheService->remember($cacheKey, $this->getCacheTtl(), $callback);
+        $tags = ['bakku', $type];
+        if ($id) {
+            $tags[] = "{$type}:{$id}";
+        }
+        return $tags;
+    }
+
+    /**
+     * Fetch and cache data from the API.
+     * @param string   $cacheKey
+     * @param \Closure $callback
+     * @param string[] $tags
+     * @return mixed
+     */
+    private function cacheAndFetch(string $cacheKey, \Closure $callback, array $tags = []): mixed
+    {
+        if (!empty($tags)) {
+            return $this->cacheService->rememberTagged($tags, $cacheKey, (int)$this->getCacheTtl(), $callback);
+        }
+        return $this->cacheService->remember($cacheKey, (int)$this->getCacheTtl(), $callback);
     }
 
     /**
      * Fetch data from the API.
+     * @return object
+     * @throws BakkuClientApiException
      */
-    private function fetchFromApi(string $type, ?string $id = null, ?string $searchQuery = null, ?string $filter = null): array|\stdClass
+    private function fetchFromApi(string $type, ?string $id = null, ?string $searchQuery = null, ?string $filter = null): object
     {
         $url = $this->buildApiUrl($type, $id, $searchQuery, $filter);
-        $response = $this->httpClientService->get($url, [
-            'Authorization' => 'Bearer ' . config('bakkuclient.api_token')
-        ]);
 
-        if ($response['status_code'] !== 200) {
-            Log::error('Failed to fetch data from API', [
+        try {
+            $responseContent = $this->httpClientService->get($url);
+            return $responseContent;
+        } catch (HttpClientNetworkException | HttpClientClientException | HttpClientServerException $e) {
+            Log::error('Failed to fetch data from API due to HTTP client error', [
                 'url' => $url,
-                'status_code' => $response['status_code'],
-                'error' => $response['error']
+                'exception' => $e->getMessage(),
+                'code' => $e->getCode(),
             ]);
             throw new BakkuClientApiException(
-                "Failed to fetch data from API: {$url} (Status: {$response['status_code']}, Error: {$response['error']})",
-                $response['status_code']
+                "Failed to fetch data from API: {$url} - " . $e->getMessage(),
+                $e->getCode(),
+                $e
             );
         }
-
-        return $response['content'];
     }
 
     /**
      * Get blocks for a specific page.
+     * @param string $page
+     * @return array<Block>
+     * @throws BakkuClientApiException
      */
-    public function getBlocks(string $page): array|\stdClass
+    public function getBlocks(string $page): array
     {
-        return $this->cacheAndFetch($this->getCacheKey(self::CACHE_KEY_BLOCKS, $page), function () use ($page) {
-            $data = $this->fetchFromApi(self::API_TYPE_DOCUMENTS, $page);
+        $cacheKey = $this->getCacheKey(self::CACHE_KEY_BLOCKS, $page);
+        $tags = $this->generateCacheTags(self::CACHE_KEY_BLOCKS, $page);
+        /** @var array<Block> $result */
+        $result = $this->cacheAndFetch($cacheKey, function () use ($page) {
+            $data = $this->fetchFromApi(BakkuClientInterface::API_TYPE_DOCUMENTS, $page);
             return $this->apiTransformer->transform($data, self::CACHE_KEY_BLOCKS);
-        });
+        }, $tags);
+        return $result;
     }
 
     /**
      * Get images for a specific page.
+     * @param string $page
+     * @return array<Image>
+     * @throws BakkuClientApiException
      */
-    public function getImages(string $page): array|\stdClass
+    public function getImages(string $page): array
     {
-        return $this->cacheAndFetch($this->getCacheKey(self::CACHE_KEY_IMAGES, $page), function () use ($page) {
-            $data = $this->fetchFromApi(self::API_TYPE_DOCUMENTS, $page);
+        $cacheKey = $this->getCacheKey(self::CACHE_KEY_IMAGES, $page);
+        $tags = $this->generateCacheTags(self::CACHE_KEY_IMAGES, $page);
+        /** @var array<Image> $result */
+        $result = $this->cacheAndFetch($cacheKey, function () use ($page) {
+            $data = $this->fetchFromApi(BakkuClientInterface::API_TYPE_DOCUMENTS, $page);
             return $this->apiTransformer->transform($data, self::CACHE_KEY_IMAGES);
-        });
+        }, $tags);
+        return $result;
     }
 
     /**
      * Get all page links.
+     * @return array<PageLink>
+     * @throws BakkuClientApiException
      */
-    public function getPageLinks(): array|\stdClass
+    public function getPageLinks(): array
     {
-        return $this->cacheAndFetch($this->getCacheKey(self::CACHE_KEY_PAGE_LINKS), function () {
-            $data = $this->fetchFromApi(self::API_TYPE_DOCUMENTS);
+        $cacheKey = $this->getCacheKey(self::CACHE_KEY_PAGE_LINKS);
+        $tags = $this->generateCacheTags(self::CACHE_KEY_PAGE_LINKS);
+        /** @var array<PageLink> $result */
+        $result = $this->cacheAndFetch($cacheKey, function () {
+            $data = $this->fetchFromApi(BakkuClientInterface::API_TYPE_DOCUMENTS);
             return $this->dataService->getPageLinks($data);
-        });
+        }, $tags);
+        return $result;
     }
 
     /**
      * Get a single image by ID.
+     * @param string $imageId
+     * @return Image|stdClass
+     * @throws BakkuClientApiException
      */
-    public function getSingleImage(string $imageId): array|\stdClass
+    public function getSingleImage(string $imageId): Image|stdClass
     {
-        return $this->cacheAndFetch($this->getCacheKey(self::CACHE_KEY_SINGLE_IMAGE, $imageId), function () use ($imageId) {
-            $data = $this->fetchFromApi(self::API_TYPE_MEDIA, $imageId);
+        $cacheKey = $this->getCacheKey(self::CACHE_KEY_SINGLE_IMAGE, $imageId);
+        $tags = $this->generateCacheTags(self::CACHE_KEY_SINGLE_IMAGE, $imageId);
+        /** @var Image|stdClass $result */
+        $result = $this->cacheAndFetch($cacheKey, function () use ($imageId) {
+            $data = $this->fetchFromApi(BakkuClientInterface::API_TYPE_MEDIA, $imageId);
             return $this->apiTransformer->transform($data, self::CACHE_KEY_SINGLE_IMAGE);
-        });
+        }, $tags);
+        return $result;
     }
 
     /**
      * Get all pages that have the search query on them.
+     * @param string $searchQuery
+     * @return array<PageLink>
+     * @throws BakkuClientApiException
      */
-    public function getSearchData(string $searchQuery): array|\stdClass
+    public function getSearchData(string $searchQuery): array
     {
-        return $this->cacheAndFetch($this->getCacheKey(self::CACHE_KEY_SEARCH, null, $searchQuery), function () use ($searchQuery) {
-            $data = $this->fetchFromApi(self::API_TYPE_SEARCH, null, $searchQuery);
+        $cacheKey = $this->getCacheKey(self::CACHE_KEY_SEARCH, null, $searchQuery);
+        $tags = $this->generateCacheTags(self::CACHE_KEY_SEARCH, md5($searchQuery)); // Tag by search query hash
+        /** @var array<PageLink> $result */
+        $result = $this->cacheAndFetch($cacheKey, function () use ($searchQuery) {
+            $data = $this->fetchFromApi(BakkuClientInterface::API_TYPE_SEARCH, null, $searchQuery);
             return $this->dataService->getPageLinks($data);
-        });
+        }, $tags);
+        return $result;
     }
 
     /**
      * Get filtered result.
+     * @param string $filter
+     * @param string $type
+     * @return array<PageLink>
+     * @throws BakkuClientApiException
      */
-    public function getFilteredData(string $filter, string $type = self::API_TYPE_DOCUMENTS): array|\stdClass
+    public function getFilteredData(string $filter, string $type = BakkuClientInterface::API_TYPE_DOCUMENTS): array
     {
-        return $this->cacheAndFetch($this->getCacheKey(self::CACHE_KEY_FILTERED_DATA, null, null, $filter), function () use ($filter, $type) {
+        $cacheKey = $this->getCacheKey(self::CACHE_KEY_FILTERED_DATA, null, null, $filter);
+        $tags = $this->generateCacheTags(self::CACHE_KEY_FILTERED_DATA, md5("{$filter}-{$type}")); // Tag by filter and type hash
+        /** @var array<PageLink> $result */
+        $result = $this->cacheAndFetch($cacheKey, function () use ($filter, $type) {
             $data = $this->fetchFromApi($type, null, null, $filter);
             return $this->dataService->getPageLinks($data);
-        });
+        }, $tags);
+        return $result;
     }
 
+    /**
+     * Get site content for a specific endpoint and type.
+     * @param string $endpoint The API endpoint to fetch.
+     * @param string $type The type of content to retrieve (e.g., 'blocks', 'images', 'documents').
+     * @return array<mixed>|\stdClass
+     * @throws BakkuClientApiException
+     */
     public function getSiteContent(string $endpoint, string $type): array|\stdClass
     {
-        return $this->cacheAndFetch($this->getCacheKey($type, $endpoint), function () use ($endpoint, $type) {
+        $cacheKey = $this->getCacheKey($type, $endpoint);
+        $tags = $this->generateCacheTags($type, $endpoint);
+        /** @var array<mixed>|\stdClass $result */
+        $result = $this->cacheAndFetch($cacheKey, function () use ($endpoint, $type) {
             $data = $this->fetchFromApi($type, $endpoint);
             return $this->apiTransformer->transform($data, $type);
-        });
+        }, $tags);
+        return $result;
     }
 }
