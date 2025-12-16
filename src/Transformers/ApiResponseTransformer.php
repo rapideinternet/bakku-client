@@ -1,55 +1,37 @@
-<?php declare(strict_types=1);
+<?php
 
 namespace RapideSoftware\BakkuClient\Transformers;
 
-use RapideSoftware\BakkuClient\DTO\Block;
-use RapideSoftware\BakkuClient\DTO\Image;
 use stdClass;
 
 class ApiResponseTransformer
 {
-    public function transform(object $response, string $type): mixed
+    public function transform($response, string $type): array|stdClass
     {
-        if (!isset($response->data) && $type !== 'single-image') { // Adjust condition for a single image
+        if (!isset($response->data)) {
             return [];
         }
 
         return match ($type) {
             'blocks' => $this->transformBlocks($response),
             'images' => $this->transformImages($response),
-            'single-image' => $this->transformSingleImage($response),
+            'image' => $this->transformSingleImage($response),
             default => $response->data,
         };
     }
 
-    /**
-     * @return Block[]
-     */
-    private function transformBlocks(object $response): array
+    private function transformBlocks($response): array
     {
-        if (empty($response->data->attributes->blocks)) {
-            return [];
-        }
-        return array_map(fn(array $blockData) => Block::fromApiResponse($blockData), $response->data->attributes->blocks);
+        return $response->data->attributes->blocks ?? [];
     }
 
-    /**
-     * @return Image[]
-     */
-    private function transformImages(object $response): array
+    private function transformImages($response): array
     {
-        if (empty($response->included)) {
-            return [];
-        }
-        return array_map(fn($imageData) => Image::fromApiResponse((object)$imageData), $response->included);
+        return $response->included ?? [];
     }
 
-    private function transformSingleImage(object $response): Image
+    private function transformSingleImage($response): array|stdClass
     {
-        if (empty($response->data)) {
-            return new Image('', '', '');
-        }
-        // Assuming single image response structure is similar to included array items
-        return Image::fromApiResponse($response->data);
+        return $response->data->attributes ?? new stdClass();
     }
 }

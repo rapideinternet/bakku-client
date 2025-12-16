@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 
 namespace RapideSoftware\BakkuClient\Services;
 
@@ -7,24 +7,18 @@ use RapideSoftware\BakkuClient\Contracts\CacheInterface;
 
 class BakkuClientCacheService implements CacheInterface
 {
-    public function set(string $key, mixed $value, int $ttl): void
+    public function set(string $key, $value, int $ttl): void
     {
         Cache::put($key, $value, $ttl);
     }
 
-    public function get(string $key): mixed
+    public function get(string $key)
     {
         return Cache::get($key);
     }
 
-    public function remember(string $key, int $ttl, \Closure $callback): mixed
+    public function remember(string $key, int $ttl, \Closure $callback)
     {
         return Cache::remember($key, $ttl, $callback);
-    }
-
-    /** @param string[] $tags */
-    public function rememberTagged(array $tags, string $key, int $ttl, \Closure $callback): mixed
-    {
-        return Cache::tags($tags)->remember($key, $ttl, $callback);
     }
 }
