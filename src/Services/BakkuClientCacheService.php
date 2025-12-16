@@ -25,15 +25,6 @@ class BakkuClientCacheService implements CacheInterface
     /** @param string[] $tags */
     public function rememberTagged(array $tags, string $key, int $ttl, \Closure $callback): mixed
     {
-        $cache = Cache::store();
-        if (method_exists($cache->getStore(), 'tags')) {
-            return $cache->tags($tags)->remember($key, $ttl, $callback);
-        }
-
-        // Fallback for cache stores that do not support tagging.
-        // We'll use a shorter TTL for non-tagged cache to mitigate staleness,
-        // as tagged cache items would normally be flushed together.
-        // Adjust this fallback TTL as appropriate for your application's needs.
-        return $cache->remember($key, (int) ($ttl / 2), $callback); // Halving TTL as a pragmatic fallback
+        return Cache::tags($tags)->remember($key, $ttl, $callback);
     }
 }
